@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import collections
 import random
 import time
@@ -29,11 +32,7 @@ def generate_random_numbers(num_rows=1000000, num_cols=1, mean=0.0, std=5.0):
     Returns:
         ret: A np.ndarray object containing the desired random numbers.
     """
-    ret = None
-
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
+    ret = np.random.normal(mean, std, (num_rows, num_cols))
     return ret
 
 
@@ -53,10 +52,11 @@ def add_one_by_loop(matrix):
             added by 1.
     """
     ret = matrix.copy()
+    M, N = matrix.shape
+    for i in range(M):
+        for j in range(N):
+            ret[i,j] += 1
 
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
     return ret
 
 
@@ -70,10 +70,7 @@ def add_one_without_loop(matrix):
         ret: A np.ndarray of the same shape as `matrix`.
     """
     ret = matrix.copy()
-
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
+    ret[...] += 1
     return ret
 
 
@@ -97,9 +94,16 @@ def measure_time_consumptions():
     Returns:
         None.
     """
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
+    matrix = generate_random_numbers()
+    t0 = time.time()
+    add_one_by_loop(matrix)
+    t1 = time.time()
+    add_one_without_loop(matrix)
+    t2 = time.time()
+    dt1 = t1 - t0
+    dt2 = t2 - t1
+    print(f'add_one_by_loop:      {dt1:.4f}s')
+    print(f'add_one_without_loop: {dt2:.4f}s (x{dt1/dt2:.2f} speedup)')
     return None
 
 
@@ -115,9 +119,18 @@ def plot_without_loop(saving_path="exponential.png"):
     Returns:
         None.
     """
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
+    x = np.arange(0, 30, 2)
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.plot(x, 2**x, label='$y = 2^x$')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_title('Exponential function')
+    ax.legend(frameon=False)
+    ax.grid(linestyle=':')
+    ax.set_axisbelow(True)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    fig.savefig(saving_path, bbox_inches='tight')
     return None
 
 
@@ -134,19 +147,22 @@ def matrix_multiplication_by_loop(matrix_a, matrix_b):
         matrix_b: A np.ndarray of shape [N, K] with arbitrary values.
 
     Returns:
-        ret: A np.ndarray of shape [M. K] which is equivalent to the product of
+        ret: A np.ndarray of shape [M, K] which is equivalent to the product of
             `matrix_a` by `matrix_b`.
     """
     assert matrix_a.shape[1] == matrix_b.shape[0]
-    ret = None
 
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
+    M, N = matrix_a.shape
+    N, K = matrix_b.shape
+    ret = np.zeros((M, K))
+    for i in range(M):
+        for j in range(N):
+            for k in range(K):
+                ret[i,k] += matrix_a[i,j] * matrix_b[j,k]
 
     # The following code is to verify that your implementation is correct.
-    assert np.all(np.isclose(ret, matrix_a @ matrix_b))
-
+    assert np.all(np.isclose(ret, matrix_a @ matrix_b)), 'matmul failed'
+    print('matmul passed')
     return ret
 
 
@@ -171,12 +187,7 @@ def matrix_manipulation():
         ret: A np.ndarray matrix of shape [10, 10] containing elements from 0 to 99.
     """
     vector = np.expand_dims(np.arange(10), 1)
-    ret = None
-
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
-
+    ret = vector * 10 + vector.T
     return ret
 
 
@@ -200,11 +211,10 @@ def normalize_rows(matrix):
         ret: A np.ndarray of the same shape as `matrix`.
     """
     assert np.all(matrix >= 0) and np.all(matrix.sum(axis=1) > 0)
-    ret = matrix.copy()
-
-    # Delete the following line and complete your implementation below.
-    raise NotImplementedError
-    # All your changes should be above this line.
+    ret = matrix.astype(np.float32, copy=True)
+    ret /= matrix.sum(axis=1, keepdims=True)
+    assert np.allclose(ret.sum(axis=1), 1), 'normalize failed'
+    print('normalize passed')
     return ret
 
 
