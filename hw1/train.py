@@ -3,6 +3,7 @@ matplotlib.use('Agg')
 import sys, os
 import numpy as np
 import pandas as pd
+import scipy.stats
 import matplotlib.pyplot as plt
 
 
@@ -89,7 +90,7 @@ def backprop(x, y, M, iters, eta, B=1):
     error = []
     for i in range(iters + 1):
 
-        if B < N and i % N == 0: # shuffle
+        if False and i % N == 0: # shuffle data
             shuffle_inds = np.random.permutation(N)
             x = x[shuffle_inds]
             y = y[shuffle_inds]
@@ -101,7 +102,7 @@ def backprop(x, y, M, iters, eta, B=1):
         # forward pass
         y_pred, z = forward(xi, w1, w2)
         y_diff = (y_pred - yi)
-        E = (y_diff**2).sum() / (2*N)
+        E = (y_diff**2).sum() / (2*B)
         assert y_diff.shape == (B, K), y_diff.shape
         assert z.shape == (B, M), z.shape
 
@@ -146,45 +147,109 @@ def backprop(x, y, M, iters, eta, B=1):
     return w1, w2, error
 
 
-if __name__ == '__main__':
-
-    # XOR data
+def load_xor_dataset():
+    # simple test dataset of XOR function
     x = np.array([
         [0, 0],
         [0, 1],
         [1, 0],
         [1, 1]
     ])
-    y = np.array([[0, 1, 1, 0]]).T
-    print(x)
-    print(y)
+    y = np.array([[0, 1, 1,0 ]]).T
+    return x, x, y, y
 
-    x_mean = x.mean()
-    y_mean = y.mean()
+
+def load_wine_dataset(data_root='wine+quality'):
+
+    # load training data
+    data_file = os.path.join(data_root, 'winequality-red.csv')
+    data = pd.read_csv(data_file, sep=';')
+
+    # select input and output columns
+    output_cols = ['quality']
+    input_cols = [c for c in data.columns if c not in output_cols]
+    x = data[input_cols].values
+    y = data[output_cols].values
+
+    # randomly split into train and test set
+    N = len(data)
+    N_test = N // 2
+    N_train = N - N_test
+    shuffle_inds = np.random.permutation(N)
+    x_train, x_test = np.split(x[shuffle_inds], [N_train])
+    y_train, y_test = np.split(y[shuffle_inds], [N_train])
+
+    return x_train, x_test, y_train, y_test
+
+
+if __name__ == '__main__':
+    print('MAIN')
+
+    #x_train, x_test, y_train, y_test = load_xor_dataset()
+    x_train, x_test, y_train, y_test = load_wine_dataset()
+
+    # standardize the data
+    x_mean, x_std = x_train.mean(), x_train.std()
+    y_mean, y_std = y_train.mean(), y_train.std()
+    x_train = (x_train - x_mean) / x_std
+    y_train = (y_train - y_mean) / y_std
+    x_test = (x_test - x_mean) / x_std
+    y_test = (y_test - y_mean) / y_std
+
+    print(x_train.shape, x_mean, x_std)
+    print(y_train.shape, y_mean, y_std)
 
     # train neural network
-    w1, w2, error = backprop(x - x_mean, y - y_mean, M=30, iters=20000, eta=5e-3, B=1)
+    B = 800
+    w1, w2, error = backprop(x_train, y_train, M=30, iters=50000, eta=5e-3, B=B)
 
-    # final evaluation
-    y_pred, z = forward(x - x_mean, w1, w2)
-    y_pred = y_pred + y_mean
-    print(y_pred)
+    # final test evaluation
+    yh_train, z = forward(x_train, w1, w2)
+    yh_test, z = forward(x_test, w1, w2)
+
+    # plot training error and correlation
+    fig, ax = plt.subplots(1, 3, figsize=(12,4))
 
     df = pd.DataFrame(dict(error=error))
-    m = df.groupby(df.index//4).mean()
-    s = df.groupby(df.index//4).std()
-
-    # plot training error
-    fig, ax = plt.subplots(figsize=(6,6))
-    ax.fill_between(
-        m.index, m.error + s.error, m.error - s.error, alpha=0.5
+    bin_size = 10
+    m = df.groupby(df.index // bin_size).mean()
+    s = df.groupby(df.index // bin_size).std()
+    ax[0].fill_between(
+        m.index * bin_size,
+        m.error + s.error,
+        m.error - s.error,
+        alpha=0.5,
+        label='std'
     )
-    ax.plot(m.index, m.error, label='train')
-    ax.legend(frameon=False)
-    ax.set_xlabel('iteration')
-    ax.set_ylabel('error')
-    max_error = np.max(error)
-    ax.set_ylim(-0.02, 0.2)
-    ax.grid(linestyle=':')
-    ax.set_axisbelow(True)
+    ax[0].plot(m.index * bin_size, m.error, label='mean')
+    ax[0].legend(frameon=False)
+    ax[0].set_xlabel('iteration')
+    ax[0].set_ylabel('error')
+    ax[0].grid(linestyle=':')
+    ax[0].set_axisbelow(True)
+    ax[0].set_xlabel('iteration')
+    ax[0].set_ylabel('error')
+
+    ax[1].scatter(y_train, yh_train, alpha=0.2)
+    x_plot = np.linspace(-2, 2, 100)
+    res = scipy.stats.linregress(y_train[:,0], yh_train[:,0])
+    ax[1].plot(
+        x_plot, res.slope * x_plot + res.intercept, label=f'R = {res.rvalue:.2f}'
+    )
+    ax[1].set_xlabel('y_train')
+    ax[1].set_ylabel('yh_train')
+    ax[1].legend(frameon=False)
+
+    res = scipy.stats.linregress(y_test[:,0], yh_test[:,0])
+    ax[2].scatter(y_test, yh_test, alpha=0.2)
+    res = scipy.stats.linregress(y_test[:,0], yh_test[:,0])
+    ax[2].plot(
+        x_plot, res.slope * x_plot + res.intercept, label=f'R = {res.rvalue:.2f}'
+    )
+    ax[2].set_xlabel('y_test')
+    ax[2].set_ylabel('yh_test')
+    ax[2].legend(frameon=False)
+
+    fig.tight_layout()
     fig.savefig('training.png', bbox_inches='tight')
+
