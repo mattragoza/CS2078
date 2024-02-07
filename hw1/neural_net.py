@@ -1,3 +1,4 @@
+import sys, os, argparse
 import matplotlib
 matplotlib.use('Agg')
 import sys, os
@@ -90,7 +91,7 @@ def backprop(x, y, M, iters, eta, B=1):
     error = []
     for i in range(iters + 1):
 
-        if False and i % N == 0: # shuffle data
+        if i % N == 0: # shuffle data
             shuffle_inds = np.random.permutation(N)
             x = x[shuffle_inds]
             y = y[shuffle_inds]
@@ -183,73 +184,77 @@ def load_wine_dataset(data_root='wine+quality'):
 
 
 if __name__ == '__main__':
-    print('MAIN')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('iterations', type=int)
+    parser.add_argument('learning_rate', type=float)
+    args = parser.parse_args()
+    iters = args.iterations
+    eta = args.learning_rate
 
     #x_train, x_test, y_train, y_test = load_xor_dataset()
+    print('Loading dataset')
     x_train, x_test, y_train, y_test = load_wine_dataset()
 
     # standardize the data
-    x_mean, x_std = x_train.mean(), x_train.std()
-    y_mean, y_std = y_train.mean(), y_train.std()
+    x_mean, x_std = x_train.mean(axis=0), x_train.std(axis=0)
+    y_mean, y_std = y_train.mean(axis=0), y_train.std(axis=0)
     x_train = (x_train - x_mean) / x_std
     y_train = (y_train - y_mean) / y_std
     x_test = (x_test - x_mean) / x_std
     y_test = (y_test - y_mean) / y_std
 
-    print(x_train.shape, x_mean, x_std)
-    print(y_train.shape, y_mean, y_std)
-
     # train neural network
-    B = 800
-    w1, w2, error = backprop(x_train, y_train, M=30, iters=50000, eta=5e-3, B=B)
+    N = len(x_train)
+    w1, w2, error = backprop(x_train, y_train, M=30, iters=iters, eta=eta, B=N)
 
     # final test evaluation
     yh_train, z = forward(x_train, w1, w2)
     yh_test, z = forward(x_test, w1, w2)
 
+    train_rmse = np.sqrt(np.mean((yh_train - y_train)**2))
+    test_rmse = np.sqrt(np.mean((yh_test - y_test)**2))
+
     # plot training error and correlation
     fig, ax = plt.subplots(1, 3, figsize=(12,4))
 
     df = pd.DataFrame(dict(error=error))
-    bin_size = 10
+    bin_size = 1
     m = df.groupby(df.index // bin_size).mean()
-    s = df.groupby(df.index // bin_size).std()
-    ax[0].fill_between(
-        m.index * bin_size,
-        m.error + s.error,
-        m.error - s.error,
-        alpha=0.5,
-        label='std'
-    )
-    ax[0].plot(m.index * bin_size, m.error, label='mean')
-    ax[0].legend(frameon=False)
+    ax[0].plot(m.index * bin_size, m.error)
     ax[0].set_xlabel('iteration')
     ax[0].set_ylabel('error')
     ax[0].grid(linestyle=':')
     ax[0].set_axisbelow(True)
     ax[0].set_xlabel('iteration')
     ax[0].set_ylabel('error')
+    ax[0].set_ylim(0.2, 0.8)
 
     ax[1].scatter(y_train, yh_train, alpha=0.2)
     x_plot = np.linspace(-2, 2, 100)
     res = scipy.stats.linregress(y_train[:,0], yh_train[:,0])
     ax[1].plot(
-        x_plot, res.slope * x_plot + res.intercept, label=f'R = {res.rvalue:.2f}'
+        x_plot, res.slope * x_plot + res.intercept,
+        label=f'R = {res.rvalue:.2f}, RMSE = {train_rmse:.2f}'
     )
     ax[1].set_xlabel('y_train')
     ax[1].set_ylabel('yh_train')
     ax[1].legend(frameon=False)
+    ax[1].grid(linestyle=':')
+    ax[1].set_axisbelow(True)
 
     res = scipy.stats.linregress(y_test[:,0], yh_test[:,0])
     ax[2].scatter(y_test, yh_test, alpha=0.2)
     res = scipy.stats.linregress(y_test[:,0], yh_test[:,0])
     ax[2].plot(
-        x_plot, res.slope * x_plot + res.intercept, label=f'R = {res.rvalue:.2f}'
+        x_plot, res.slope * x_plot + res.intercept,
+        label=f'R = {res.rvalue:.2f}, RMSE = {test_rmse:.2f}'
     )
     ax[2].set_xlabel('y_test')
     ax[2].set_ylabel('yh_test')
     ax[2].legend(frameon=False)
+    ax[2].grid(linestyle=':')
+    ax[2].set_axisbelow(True)
 
     fig.tight_layout()
-    fig.savefig('training.png', bbox_inches='tight')
+    fig.savefig(f'training_{iters}_{eta}.png', bbox_inches='tight')
 
