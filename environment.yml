@@ -15,5 +15,7 @@ dependencies:
   - tensorboard
   - matplotlib
   - seaborn
+  - jupyter
   - ipykernel
+  - ipywidgets
   - tqdm
