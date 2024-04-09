@@ -41,6 +41,7 @@ class CaptioningTransformer(nn.Module):
         self.visual_projection = nn.Linear(input_dim, wordvec_dim)
         self.embedding = nn.Embedding(vocab_size, wordvec_dim, padding_idx=self._null)
         self.positional_encoding = PositionalEncoding(wordvec_dim, max_len=max_length)
+        self.wordvec_dim = wordvec_dim
 
         decoder_layer = TransformerDecoderLayer(input_dim=wordvec_dim, num_heads=num_heads)
         self.transformer = TransformerDecoder(decoder_layer, num_layers=num_layers)
@@ -74,6 +75,7 @@ class CaptioningTransformer(nn.Module):
          - scores: score for each token at each timestep, of shape (N, T, V)
         """
         N, T = captions.shape
+
         # Create a placeholder, to be overwritten by your code below.
         scores = torch.empty((N, T, self.vocab_size))
         ############################################################################
@@ -90,7 +92,22 @@ class CaptioningTransformer(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        caption_embeddings = self.embedding(captions)
+        caption_embeddings = self.positional_encoding(caption_embeddings)
+        assert caption_embeddings.shape == (N, T, self.wordvec_dim)
+
+        visual_features = self.visual_projection(features).unsqueeze(1)
+        assert visual_features.shape == (N, 1, self.wordvec_dim)
+
+        mask = torch.tril(torch.ones(T, T, dtype=bool))
+
+        transformer_output = self.transformer(
+            caption_embeddings, visual_features, mask
+        )
+        assert transformer_output.shape == (N, T, self.wordvec_dim)
+
+        scores = self.output(transformer_output)
+        assert scores.shape == (N, T, self.vocab_size)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
