@@ -38,7 +38,11 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        i = torch.arange(max_len).unsqueeze(1)
+        j = torch.arange(embed_dim).unsqueeze(0)
+
+        pe[0,:,::2] = torch.sin(i * 10000**(-j[:,::2] / embed_dim))
+        pe[0,:,1::2] = torch.cos(i * 10000**(-(j[:,1::2] - 1) / embed_dim))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -70,7 +74,7 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        output = self.dropout(x + self.pe[:,:S])
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
