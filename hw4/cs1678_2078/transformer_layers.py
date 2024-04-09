@@ -111,8 +111,7 @@ class MultiHeadAttention(nn.Module):
         # We will initialize these layers for you, since swapping the ordering
         # would affect the random number generation (and therefore your exact
         # outputs relative to the autograder). Note that the layers use a bias
-        # term, but this isn't strictly necessary (and varies by
-        # implementation).
+        # term, but this isn't strictly necessary (and varies by implementation).
         self.key = nn.Linear(embed_dim, embed_dim)
         self.query = nn.Linear(embed_dim, embed_dim)
         self.value = nn.Linear(embed_dim, embed_dim)
@@ -145,10 +144,12 @@ class MultiHeadAttention(nn.Module):
           data in value according to the attention weights calculated using key
           and query.
         """
-        N, S, E = query.shape
-        N, T, E = value.shape
+        N, S, E = query.shape # (batch_size, input_length, embedding_size)
+        N, T, E = value.shape # (batch_size, output_length, embedding_size)
+
         # Create a placeholder, to be overwritten by your code below.
         output = torch.empty((N, S, E))
+
         ############################################################################
         # TODO: Implement multiheaded attention using the equations given in       #
         # Transformer_Captioning.ipynb.                                            #
@@ -165,7 +166,26 @@ class MultiHeadAttention(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        H = self.n_head
+        query = self.query(query).reshape(N, S, H, E//H)
+        key   = self.key(key).reshape(N, T, H, E//H)
+        value = self.value(value).reshape(N, T, H, E//H)
+
+        attn_scores = torch.einsum('nshe,nthe->nhst', query, key) / math.sqrt(E//H)
+        assert attn_scores.shape == (N, H, S, T)
+
+        if attn_mask is not None:
+            attn_scores.masked_fill_(~attn_mask, -torch.inf)
+
+        attn_distrib = self.attn_drop(F.softmax(attn_scores, dim=-1))
+
+        assert attn_distrib.shape == (N, H, S, T)
+
+        output = torch.einsum('nhst,nthe->nshe', attn_distrib, value)
+        assert output.shape == (N, S, H, E//H)
+
+        output = output.reshape(N, S, E)
+        output = self.proj(output)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
